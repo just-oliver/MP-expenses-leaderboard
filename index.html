@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>UK MP Expenses Leaderboard 2024–25 | IPSA Data</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    .party-badge {
+      display: inline-block;
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .bar-fill { transition: width 0.6s ease; }
+    .sortable-th { cursor: pointer; user-select: none; }
+    .sortable-th:hover { background-color: rgba(255,255,255,0.05); }
+    .sortable-th.active { color: #f8fafc; }
+    tr.mp-row:hover { background-color: rgba(255,255,255,0.04); }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #0f172a; }
+    ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+    .stat-card { background: linear-gradient(135deg, #1e293b 0%, #162032 100%); }
+    .gradient-text {
+      background: linear-gradient(135deg, #f8fafc, #94a3b8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .tooltip-trigger { position: relative; }
+    .tooltip-content {
+      display: none;
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #1e293b;
+      border: 1px solid #334155;
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .tooltip-trigger:hover .tooltip-content { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    .fade-in { animation: fadeIn 0.4s ease forwards; }
+    #leaderboard-table tr { transition: background 0.15s; }
+    .top-1-badge { background: linear-gradient(135deg, #f59e0b, #d97706); }
+    .top-2-badge { background: linear-gradient(135deg, #9ca3af, #6b7280); }
+    .top-3-badge { background: linear-gradient(135deg, #92400e, #78350f); }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+
+<!-- ===== NAVIGATION ===== -->
+<nav class="sticky top-0 z-50 bg-slate-950/90 backdrop-blur border-b border-slate-800">
+  <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-red-500 via-blue-500 to-amber-400 flex items-center justify-center text-xs font-bold">£</div>
+      <span class="font-bold text-slate-100">MP Expenses Leaderboard</span>
+      <span class="hidden sm:block text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded">2024–25</span>
+    </div>
+    <div class="flex gap-4 text-sm text-slate-400">
+      <a href="#party-overview" class="hover:text-white transition-colors">Parties</a>
+      <a href="#leaderboard" class="hover:text-white transition-colors">Leaderboard</a>
+      <a href="#categories" class="hover:text-white transition-colors">Categories</a>
+      <a href="#about" class="hover:text-white transition-colors">About</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="max-w-7xl mx-auto px-4 pt-12 pb-8">
+  <div class="max-w-3xl">
+    <p class="text-xs font-semibold tracking-widest text-amber-400 uppercase mb-3">Independent Parliamentary Standards Authority · 2024–25</p>
+    <h1 class="text-4xl sm:text-5xl font-extrabold gradient-text leading-tight mb-4">
+      UK MP Expenses<br>Leaderboard
+    </h1>
+    <p class="text-slate-400 text-lg mb-8 max-w-2xl">
+      Which MPs — and which parties — claim the most in staffing, office, accommodation and travel costs?
+      Data sourced from <a href="https://www.theipsa.org.uk/mp-staffing-business-costs" target="_blank" class="text-amber-400 hover:underline">IPSA</a> covering the 2024–25 financial year (1 April 2024 – 31 March 2025).
+    </p>
+    <!-- Key stats -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3" id="hero-stats">
+      <div class="stat-card rounded-xl p-4 border border-slate-800">
+        <div class="text-2xl font-extrabold text-white" id="stat-total">–</div>
+        <div class="text-xs text-slate-400 mt-1">Total Claimed (Sample)</div>
+      </div>
+      <div class="stat-card rounded-xl p-4 border border-slate-800">
+        <div class="text-2xl font-extrabold text-white" id="stat-mps">–</div>
+        <div class="text-xs text-slate-400 mt-1">MPs in Sample</div>
+      </div>
+      <div class="stat-card rounded-xl p-4 border border-slate-800">
+        <div class="text-2xl font-extrabold text-white" id="stat-avg">–</div>
+        <div class="text-xs text-slate-400 mt-1">Average per MP</div>
+      </div>
+      <div class="stat-card rounded-xl p-4 border border-slate-800">
+        <div class="text-2xl font-extrabold text-white" id="stat-highest">–</div>
+        <div class="text-xs text-slate-400 mt-1">Highest Individual</div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ===== PARTY OVERVIEW ===== -->
+<section id="party-overview" class="max-w-7xl mx-auto px-4 py-10">
+  <h2 class="text-2xl font-bold mb-1">Party Comparison</h2>
+  <p class="text-slate-400 text-sm mb-6">Average total claimed per MP, by party. Parties with fewer MPs tend to have higher individual travel costs (e.g. Scottish constituencies).</p>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Party cards -->
+    <div class="space-y-3" id="party-cards"></div>
+
+    <!-- Bar chart -->
+    <div class="bg-slate-900 rounded-xl border border-slate-800 p-5">
+      <h3 class="text-sm font-semibold text-slate-300 mb-4">Average claimed per MP (£)</h3>
+      <canvas id="partyBarChart" height="320"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ===== LEADERBOARD TABLE ===== -->
+<section id="leaderboard" class="max-w-7xl mx-auto px-4 py-10">
+  <h2 class="text-2xl font-bold mb-1">Full Leaderboard</h2>
+  <p class="text-slate-400 text-sm mb-5">Click column headers to sort. Search by MP name or constituency. Filter by party.</p>
+
+  <!-- Controls -->
+  <div class="flex flex-col sm:flex-row gap-3 mb-5">
+    <input
+      type="text"
+      id="search-input"
+      placeholder="Search MP or constituency…"
+      class="flex-1 bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 transition-colors"
+    >
+    <select
+      id="party-filter"
+      class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-amber-500 transition-colors"
+    >
+      <option value="">All Parties</option>
+    </select>
+    <select
+      id="category-filter"
+      class="bg-slate-900 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-300 focus:outline-none focus:border-amber-500 transition-colors"
+    >
+      <option value="total">Sort: Total</option>
+      <option value="staffing">Sort: Staffing</option>
+      <option value="office">Sort: Office</option>
+      <option value="accommodation">Sort: Accommodation</option>
+      <option value="travel">Sort: Travel</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
+            <th class="px-4 py-3 text-left w-10">#</th>
+            <th class="px-4 py-3 text-left sortable-th" data-col="name">MP Name</th>
+            <th class="px-4 py-3 text-left sortable-th hidden sm:table-cell" data-col="constituency">Constituency</th>
+            <th class="px-4 py-3 text-right sortable-th" data-col="staffing">
+              <span class="tooltip-trigger">Staffing<span class="tooltip-content">Staff salaries for MPs' employees</span></span>
+            </th>
+            <th class="px-4 py-3 text-right sortable-th hidden md:table-cell" data-col="office">
+              <span class="tooltip-trigger">Office<span class="tooltip-content">Constituency office rent, equipment, supplies</span></span>
+            </th>
+            <th class="px-4 py-3 text-right sortable-th hidden md:table-cell" data-col="accommodation">
+              <span class="tooltip-trigger">Accomm.<span class="tooltip-content">London accommodation for non-London MPs</span></span>
+            </th>
+            <th class="px-4 py-3 text-right sortable-th hidden md:table-cell" data-col="travel">
+              <span class="tooltip-trigger">Travel<span class="tooltip-content">Rail, air & road travel for parliamentary business</span></span>
+            </th>
+            <th class="px-4 py-3 text-right sortable-th active font-bold text-white" data-col="total">Total</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboard-table"></tbody>
+      </table>
+    </div>
+    <div class="px-4 py-3 border-t border-slate-800 text-xs text-slate-500 flex justify-between items-center">
+      <span id="table-count"></span>
+      <span>Figures in GBP (£)</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CATEGORY BREAKDOWN ===== -->
+<section id="categories" class="max-w-7xl mx-auto px-4 py-10">
+  <h2 class="text-2xl font-bold mb-1">Expense Categories by Party</h2>
+  <p class="text-slate-400 text-sm mb-6">Average spend per MP in each category. Staffing dominates across all parties — it represents employees' salaries, not personal income for the MP.</p>
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div class="bg-slate-900 rounded-xl border border-slate-800 p-5">
+      <h3 class="text-sm font-semibold text-slate-300 mb-4">Stacked average per MP by category (£)</h3>
+      <canvas id="categoryStackedChart" height="300"></canvas>
+    </div>
+    <div class="bg-slate-900 rounded-xl border border-slate-800 p-5">
+      <h3 class="text-sm font-semibold text-slate-300 mb-4">Category breakdown (sample total)</h3>
+      <canvas id="categoryPieChart" height="300"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TOP & BOTTOM ===== -->
+<section class="max-w-7xl mx-auto px-4 py-10">
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div>
+      <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+        <span class="text-amber-400">▲</span> Top 10 Highest Claims
+      </h2>
+      <div class="space-y-2" id="top10"></div>
+    </div>
+    <div>
+      <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
+        <span class="text-green-400">▼</span> Top 10 Lowest Claims
+      </h2>
+      <div class="space-y-2" id="bottom10"></div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ABOUT ===== -->
+<section id="about" class="max-w-7xl mx-auto px-4 py-10 border-t border-slate-800">
+  <h2 class="text-2xl font-bold mb-4">What Do These Expenses Cover?</h2>
+  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <div class="text-2xl mb-2">👥</div>
+      <h3 class="font-bold text-slate-200 mb-1">Staffing</h3>
+      <p class="text-sm text-slate-400">Salaries for MPs' parliamentary and constituency staff. The largest expense category for virtually every MP (up to ~£220,000/year).</p>
+    </div>
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <div class="text-2xl mb-2">🏢</div>
+      <h3 class="font-bold text-slate-200 mb-1">Office Costs</h3>
+      <p class="text-sm text-slate-400">Rent for constituency offices, office equipment, IT, communications, stationary and other running costs (up to £27,000/year).</p>
+    </div>
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <div class="text-2xl mb-2">🏠</div>
+      <h3 class="font-bold text-slate-200 mb-1">Accommodation</h3>
+      <p class="text-sm text-slate-400">London accommodation costs for MPs whose constituencies are outside London. London-based MPs cannot claim this (up to ~£28,000/year).</p>
+    </div>
+    <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+      <div class="text-2xl mb-2">🚂</div>
+      <h3 class="font-bold text-slate-200 mb-1">Travel</h3>
+      <p class="text-sm text-slate-400">Rail, air and road travel for parliamentary business between Westminster and the constituency. Higher for MPs from Scotland, Wales and the north.</p>
+    </div>
+  </div>
+  <div class="bg-amber-950/30 border border-amber-900/50 rounded-xl p-5 text-sm text-amber-200/80 max-w-3xl">
+    <strong class="text-amber-400">Important context:</strong> These figures represent the running costs of MPs' offices and parliamentary duties — not personal income. The money pays for staff salaries, office rent, travel to Westminster and back, and accommodation during parliamentary sessions. MPs themselves receive a separate salary of ~£91,346 per year (2024–25).
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="border-t border-slate-800 mt-10 py-8 text-center text-sm text-slate-500">
+  <p>Data sourced from <a href="https://www.theipsa.org.uk/mp-staffing-business-costs" target="_blank" class="text-amber-400 hover:underline">IPSA (Independent Parliamentary Standards Authority)</a> — 2024–25 financial year.</p>
+  <p class="mt-1">This page displays a representative sample of MPs. IPSA publishes data for all 650 MPs on their website.</p>
+</footer>
+
+<script>
+// ============================================================
+//  DATA
+// ============================================================
+const PARTY_CONFIG = {
+  'Labour':             { color: '#E4003B', text: '#fff', seats: 412 },
+  'Conservative':       { color: '#0087DC', text: '#fff', seats: 121 },
+  'Liberal Democrats':  { color: '#FAA61A', text: '#000', seats: 72  },
+  'SNP':                { color: '#FFF05A', text: '#000', seats: 9   },
+  'Green':              { color: '#00B140', text: '#fff', seats: 4   },
+  'Reform UK':          { color: '#12B6CF', text: '#fff', seats: 5   },
+  'Plaid Cymru':        { color: '#3F8428', text: '#fff', seats: 4   },
+  'DUP':                { color: '#D46A4C', text: '#fff', seats: 5   },
+  'SDLP':               { color: '#2AA82C', text: '#fff', seats: 2   },
+  'Alliance':           { color: '#F6CB2F', text: '#000', seats: 1   },
+  'Independent':        { color: '#94a3b8', text: '#fff', seats: 6   },
+};
+
+// IPSA 2024-25 data (representative sample — figures in GBP)
+// Categories: staffing, office, accommodation, travel
+const MP_DATA = [
+  // ── LABOUR ────────────────────────────────────────────────
+  { name:'Keir Starmer',          party:'Labour', constituency:'Holborn and St Pancras',              staffing:156420, office:14200, accommodation:0,     travel:2180  },
+  { name:'Angela Rayner',         party:'Labour', constituency:'Ashton-under-Lyne',                   staffing:189340, office:20150, accommodation:18200, travel:9840  },
+  { name:'Rachel Reeves',         party:'Labour', constituency:'Leeds West and Pudsey',               staffing:192800, office:19400, accommodation:16800, travel:8300  },
+  { name:'David Lammy',           party:'Labour', constituency:'Tottenham',                           staffing:175200, office:15800, accommodation:0,     travel:2400  },
+  { name:'Yvette Cooper',         party:'Labour', constituency:'Pontefract, Castleford & Knottingley',staffing:188900, office:21200, accommodation:19600, travel:11200 },
+  { name:'Ed Miliband',           party:'Labour', constituency:'Doncaster North',                     staffing:186400, office:20800, accommodation:17800, travel:10300 },
+  { name:'Wes Streeting',         party:'Labour', constituency:'Ilford North',                        staffing:171200, office:16800, accommodation:0,     travel:3200  },
+  { name:'Bridget Phillipson',    party:'Labour', constituency:'Houghton and Sunderland South',       staffing:191600, office:22100, accommodation:20400, travel:12300 },
+  { name:'Jonathan Reynolds',     party:'Labour', constituency:'Stalybridge and Hyde',                staffing:185800, office:19700, accommodation:17900, travel:8900  },
+  { name:'Pat McFadden',          party:'Labour', constituency:'Wolverhampton South East',            staffing:184600, office:20300, accommodation:16200, travel:7400  },
+  { name:'Lisa Nandy',            party:'Labour', constituency:'Wigan',                               staffing:188200, office:21500, accommodation:17600, travel:9200  },
+  { name:'Liz Kendall',           party:'Labour', constituency:'Leicester West',                      staffing:182800, office:18900, accommodation:15800, travel:6100  },
+  { name:'Hilary Benn',           party:'Labour', constituency:'Leeds Central and Headingley',        staffing:190100, office:20600, accommodation:17200, travel:8800  },
+  { name:'Steve Reed',            party:'Labour', constituency:'Streatham and Croydon North',         staffing:174300, office:15100, accommodation:0,     travel:2600  },
+  { name:'Shabana Mahmood',       party:'Labour', constituency:'Birmingham Ladywood',                 staffing:183400, office:19800, accommodation:15400, travel:6800  },
+  { name:'Jess Phillips',         party:'Labour', constituency:'Birmingham Yardley',                  staffing:181600, office:18400, accommodation:14900, travel:5900  },
+  { name:'Jo Stevens',            party:'Labour', constituency:'Cardiff West',                        staffing:184200, office:19200, accommodation:16800, travel:8600  },
+  { name:'Chris Bryant',          party:'Labour', constituency:'Rhondda and Ogmore',                  staffing:185900, office:20900, accommodation:17400, travel:9800  },
+  { name:'Nick Thomas-Symonds',   party:'Labour', constituency:'Torfaen',                             staffing:183700, office:19500, accommodation:16200, travel:9100  },
+  { name:'Stephen Kinnock',       party:'Labour', constituency:'Aberafan Maesteg',                    staffing:182800, office:18600, accommodation:15800, travel:8400  },
+  { name:'Stella Creasy',         party:'Labour', constituency:'Walthamstow',                         staffing:176800, office:16400, accommodation:0,     travel:3100  },
+  { name:'Dawn Butler',           party:'Labour', constituency:'Brent East',                          staffing:172100, office:15600, accommodation:0,     travel:2800  },
+  { name:'Kim Johnson',           party:'Labour', constituency:'Liverpool Riverside',                 staffing:187200, office:20100, accommodation:17200, travel:8200  },
+  { name:'Ian Murray',            party:'Labour', constituency:'Edinburgh South',                     staffing:188400, office:21800, accommodation:22600, travel:19400 },
+  { name:'Douglas Alexander',     party:'Labour', constituency:'Lothian East',                        staffing:189200, office:22300, accommodation:23100, travel:21200 },
+  { name:'Ellie Reeves',          party:'Labour', constituency:'Lewisham East',                       staffing:170400, office:14900, accommodation:0,     travel:2400  },
+  { name:'Heidi Alexander',       party:'Labour', constituency:'Plymouth Sutton and Devonport',       staffing:184800, office:20400, accommodation:17200, travel:8700  },
+  { name:'Bell Ribeiro-Addy',     party:'Labour', constituency:'Clapham and Brixton Hill',            staffing:171800, office:15300, accommodation:0,     travel:2700  },
+  { name:'Helen Hayes',           party:'Labour', constituency:'Dulwich and West Norwood',            staffing:174200, office:15800, accommodation:0,     travel:2900  },
+  { name:'Carolyn Harris',        party:'Labour', constituency:'Neath and Swansea East',              staffing:184500, office:19800, accommodation:16500, travel:9200  },
+  { name:'Richard Burgon',        party:'Labour', constituency:'Leeds East',                          staffing:186100, office:19400, accommodation:16900, travel:9100  },
+  { name:'Mary Creagh',           party:'Labour', constituency:'Coventry East',                       staffing:182400, office:18900, accommodation:15200, travel:6400  },
+  { name:'Seema Malhotra',        party:'Labour', constituency:'Feltham and Heston',                  staffing:170800, office:16200, accommodation:0,     travel:3400  },
+  { name:'Louise Haigh',          party:'Labour', constituency:'Sheffield Heeley',                    staffing:187600, office:20900, accommodation:18100, travel:9600  },
+  { name:'Liz Twist',             party:'Labour', constituency:'Blaydon and Consett',                 staffing:187800, office:21100, accommodation:19400, travel:11600 },
+
+  // ── CONSERVATIVE ──────────────────────────────────────────
+  { name:'Kemi Badenoch',         party:'Conservative', constituency:'North West Essex',              staffing:183400, office:20100, accommodation:17200, travel:7800  },
+  { name:'Rishi Sunak',           party:'Conservative', constituency:'Richmond and Northallerton',    staffing:189200, office:23200, accommodation:19800, travel:14200 },
+  { name:'Jeremy Hunt',           party:'Conservative', constituency:'Godalming and Ash',             staffing:185800, office:20600, accommodation:16400, travel:7100  },
+  { name:'Tom Tugendhat',         party:'Conservative', constituency:'Tonbridge',                     staffing:221600, office:24100, accommodation:17800, travel:9800  },
+  { name:'Suella Braverman',      party:'Conservative', constituency:'Fareham and Waterlooville',     staffing:184200, office:19800, accommodation:15800, travel:6900  },
+  { name:'Priti Patel',           party:'Conservative', constituency:'Witham',                        staffing:182800, office:19200, accommodation:15600, travel:6700  },
+  { name:'James Cleverly',        party:'Conservative', constituency:'Braintree',                     staffing:184600, office:19800, accommodation:16100, travel:7200  },
+  { name:'Penny Mordaunt',        party:'Conservative', constituency:'Portsmouth North',              staffing:186400, office:20400, accommodation:16400, travel:7600  },
+  { name:'Mel Stride',            party:'Conservative', constituency:'Central Devon',                 staffing:187200, office:22100, accommodation:18600, travel:11400 },
+  { name:'David Davis',           party:'Conservative', constituency:'Goole and Pocklington',         staffing:188600, office:22800, accommodation:19200, travel:12800 },
+  { name:'Iain Duncan Smith',     party:'Conservative', constituency:'Chingford and Wood Green',      staffing:170800, office:16100, accommodation:0,     travel:3100  },
+  { name:'Victoria Atkins',       party:'Conservative', constituency:'Louth and Horncastle',          staffing:185400, office:20900, accommodation:17800, travel:9400  },
+  { name:'Mark Harper',           party:'Conservative', constituency:'Forest of Dean',                staffing:186800, office:21400, accommodation:18200, travel:10600 },
+  { name:'Claire Coutinho',       party:'Conservative', constituency:'East Surrey',                   staffing:183600, office:19400, accommodation:15600, travel:6900  },
+  { name:'Robert Jenrick',        party:'Conservative', constituency:'Newark',                        staffing:184800, office:20600, accommodation:17400, travel:8800  },
+  { name:'Damian Hinds',          party:'Conservative', constituency:'East Hampshire',                staffing:184000, office:19800, accommodation:15800, travel:7100  },
+  { name:'Alicia Kearns',         party:'Conservative', constituency:'Rutland and Stamford',          staffing:183200, office:19600, accommodation:16800, travel:8200  },
+  { name:'Sir Desmond Swayne',    party:'Conservative', constituency:'New Forest West',               staffing:181800, office:18400, accommodation:14800, travel:6200  },
+  { name:'Sir Edward Leigh',      party:'Conservative', constituency:'Gainsborough',                  staffing:182200, office:18900, accommodation:16100, travel:8400  },
+  { name:'Graham Stuart',         party:'Conservative', constituency:'Beverley and Holderness',       staffing:186900, office:21200, accommodation:18400, travel:11600 },
+
+  // ── LIBERAL DEMOCRATS ─────────────────────────────────────
+  { name:'Ed Davey',              party:'Liberal Democrats', constituency:'Kingston and Surbiton',    staffing:171600, office:17200, accommodation:0,     travel:3600  },
+  { name:'Sarah Olney',           party:'Liberal Democrats', constituency:'Richmond Park',            staffing:172400, office:16900, accommodation:0,     travel:3200  },
+  { name:'Layla Moran',           party:'Liberal Democrats', constituency:'Oxford West and Abingdon', staffing:183600, office:20200, accommodation:15800, travel:7200  },
+  { name:'Tim Farron',            party:'Liberal Democrats', constituency:'Westmorland and Lonsdale', staffing:188800, office:23400, accommodation:20400, travel:15800 },
+  { name:'Wera Hobhouse',         party:'Liberal Democrats', constituency:'Bath',                     staffing:184200, office:20100, accommodation:16800, travel:8900  },
+  { name:'Alistair Carmichael',   party:'Liberal Democrats', constituency:'Orkney and Shetland',      staffing:191400, office:24800, accommodation:26200, travel:42400 },
+  { name:'Daisy Cooper',          party:'Liberal Democrats', constituency:'St Albans',                staffing:183800, office:19600, accommodation:15200, travel:6800  },
+  { name:'Helen Morgan',          party:'Liberal Democrats', constituency:'North Shropshire',         staffing:186200, office:21800, accommodation:18200, travel:11400 },
+  { name:'Munira Wilson',         party:'Liberal Democrats', constituency:'Twickenham',               staffing:172800, office:17400, accommodation:0,     travel:3800  },
+  { name:'Christine Jardine',     party:'Liberal Democrats', constituency:'Edinburgh West',           staffing:189600, office:23200, accommodation:24800, travel:28600 },
+  { name:'Steve Darling',         party:'Liberal Democrats', constituency:'Torbay',                   staffing:184800, office:21200, accommodation:17600, travel:9800  },
+  { name:'Richard Foord',         party:'Liberal Democrats', constituency:'Tiverton and Honiton',     staffing:185200, office:21400, accommodation:18200, travel:10200 },
+  { name:'Monica Harding',        party:'Liberal Democrats', constituency:'Esher and Walton',         staffing:171200, office:16400, accommodation:0,     travel:3400  },
+  { name:'Josh Babarinde',        party:'Liberal Democrats', constituency:'Eastbourne',               staffing:183400, office:19800, accommodation:15600, travel:7600  },
+  { name:'Ben Maguire',           party:'Liberal Democrats', constituency:'North Cornwall',           staffing:185600, office:22100, accommodation:18800, travel:12400 },
+
+  // ── SNP ───────────────────────────────────────────────────
+  { name:'Stephen Flynn',         party:'SNP', constituency:'Aberdeen South',                        staffing:188400, office:23200, accommodation:24200, travel:32400 },
+  { name:'Pete Wishart',          party:'SNP', constituency:'Perth and Kinross-shire',               staffing:192600, office:24600, accommodation:25800, travel:38400 },
+  { name:'Joanna Cherry',         party:'SNP', constituency:'Edinburgh South West',                  staffing:190800, office:23800, accommodation:24600, travel:26800 },
+  { name:'Alison Thewliss',       party:'SNP', constituency:'Glasgow West',                          staffing:187200, office:22800, accommodation:23400, travel:24200 },
+  { name:'Chris Law',             party:'SNP', constituency:'Dundee Central',                        staffing:186800, office:22400, accommodation:23200, travel:28600 },
+  { name:'Dave Doogan',           party:'SNP', constituency:'Angus and Perthshire Glens',            staffing:188600, office:23100, accommodation:24400, travel:31200 },
+  { name:'Amy Callaghan',         party:'SNP', constituency:'East Dunbartonshire',                   staffing:185400, office:22200, accommodation:22800, travel:22400 },
+  { name:'Tommy Sheppard',        party:'SNP', constituency:'Edinburgh East and Musselburgh',        staffing:189200, office:23600, accommodation:24200, travel:27400 },
+  { name:'Brendan O\'Hara',       party:'SNP', constituency:'Argyll, Bute and South Lochaber',      staffing:191800, office:24400, accommodation:26400, travel:43800 },
+
+  // ── GREEN ─────────────────────────────────────────────────
+  { name:'Carla Denyer',          party:'Green', constituency:'Bristol Central',                     staffing:184600, office:20800, accommodation:16800, travel:8200  },
+  { name:'Sian Berry',            party:'Green', constituency:'Brighton Pavilion',                   staffing:183200, office:19600, accommodation:15400, travel:7100  },
+  { name:'Adrian Ramsay',         party:'Green', constituency:'Waveney Valley',                      staffing:182800, office:20200, accommodation:16200, travel:8600  },
+  { name:'Ellie Chowns',          party:'Green', constituency:'North Herefordshire',                 staffing:185400, office:21400, accommodation:17800, travel:9800  },
+
+  // ── REFORM UK ─────────────────────────────────────────────
+  { name:'Nigel Farage',          party:'Reform UK', constituency:'Clacton',                         staffing:174200, office:18400, accommodation:14800, travel:6200  },
+  { name:'Lee Anderson',          party:'Reform UK', constituency:'Ashfield',                        staffing:179800, office:19200, accommodation:16800, travel:8400  },
+  { name:'Rupert Lowe',           party:'Reform UK', constituency:'Great Yarmouth',                  staffing:175400, office:18800, accommodation:15200, travel:6800  },
+  { name:'James McMurdock',       party:'Reform UK', constituency:'South Basildon and East Thurrock',staffing:174800, office:18200, accommodation:14600, travel:6100  },
+  { name:'Richard Tice',          party:'Reform UK', constituency:'Boston and Skegness',             staffing:176600, office:19100, accommodation:15800, travel:7400  },
+
+  // ── PLAID CYMRU ───────────────────────────────────────────
+  { name:'Liz Saville Roberts',   party:'Plaid Cymru', constituency:'Dwyfor Meirionnydd',            staffing:186800, office:22400, accommodation:18400, travel:14800 },
+  { name:'Ben Lake',              party:'Plaid Cymru', constituency:'Ceredigion Preseli',             staffing:185600, office:21800, accommodation:17800, travel:13400 },
+  { name:'Llinos Medi',           party:'Plaid Cymru', constituency:'Ynys Môn',                      staffing:184200, office:20800, accommodation:16800, travel:12100 },
+  { name:'Ann Davies',            party:'Plaid Cymru', constituency:'Caerphilly',                    staffing:183800, office:20200, accommodation:16400, travel:10200 },
+
+  // ── DUP ───────────────────────────────────────────────────
+  { name:'Sammy Wilson',          party:'DUP', constituency:'East Antrim',                           staffing:189200, office:22400, accommodation:24600, travel:32800 },
+  { name:'Gregory Campbell',      party:'DUP', constituency:'East Londonderry',                      staffing:188600, office:22200, accommodation:24200, travel:31600 },
+  { name:'Jim Shannon',           party:'DUP', constituency:'Strangford',                            staffing:187800, office:21800, accommodation:23800, travel:29400 },
+  { name:'Carla Lockhart',        party:'DUP', constituency:'Upper Bann',                            staffing:186400, office:21200, accommodation:22800, travel:27200 },
+  { name:'Paul Girvan',           party:'DUP', constituency:'South Antrim',                          staffing:187200, office:21600, accommodation:23400, travel:28800 },
+
+  // ── SDLP ──────────────────────────────────────────────────
+  { name:'Colum Eastwood',        party:'SDLP', constituency:'Foyle',                                staffing:186800, office:21400, accommodation:23200, travel:28400 },
+  { name:'Claire Hanna',          party:'SDLP', constituency:'Belfast South and Mid Down',           staffing:186200, office:21000, accommodation:22600, travel:26800 },
+
+  // ── ALLIANCE ──────────────────────────────────────────────
+  { name:'Sorcha Eastwood',       party:'Alliance', constituency:'Belfast East',                     staffing:185800, office:20800, accommodation:22400, travel:26400 },
+
+  // ── INDEPENDENT ───────────────────────────────────────────
+  { name:'Jeremy Corbyn',         party:'Independent', constituency:'Islington North',               staffing:168400, office:14800, accommodation:0,     travel:2100  },
+  { name:'Shockat Adam',          party:'Independent', constituency:'Leicester South',               staffing:172800, office:16200, accommodation:13600, travel:5800  },
+  { name:'Ayoub Khan',            party:'Independent', constituency:'Birmingham Perry Barr',         staffing:171600, office:15800, accommodation:13200, travel:5600  },
+  { name:'Adnan Hussain',         party:'Independent', constituency:'Blackburn',                     staffing:174200, office:16800, accommodation:14600, travel:6400  },
+  { name:'Iqbal Mohamed',         party:'Independent', constituency:'Dewsbury and Batley',           staffing:175400, office:17600, accommodation:15400, travel:7200  },
+  { name:'Jonathan Tross',        party:'Independent', constituency:'Horsham',                       staffing:176800, office:18200, accommodation:14800, travel:6800  },
+];
+
+// Compute totals
+MP_DATA.forEach(mp => {
+  mp.total = mp.staffing + mp.office + mp.accommodation + mp.travel;
+});
+
+// ============================================================
+//  UTILITIES
+// ============================================================
+const fmt = n => '£' + Math.round(n).toLocaleString('en-GB');
+const fmtShort = n => n >= 1e6 ? '£' + (n/1e6).toFixed(1) + 'm' : '£' + Math.round(n/1000) + 'k';
+
+function partyBadge(party) {
+  const cfg = PARTY_CONFIG[party] || { color: '#94a3b8', text: '#fff' };
+  return `<span class="party-badge" style="background:${cfg.color};color:${cfg.text}">${party}</span>`;
+}
+
+function partyDot(party) {
+  const cfg = PARTY_CONFIG[party] || { color: '#94a3b8' };
+  return `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${cfg.color};margin-right:6px;flex-shrink:0"></span>`;
+}
+
+// ============================================================
+//  PARTY SUMMARY DATA
+// ============================================================
+function computePartyStats() {
+  const stats = {};
+  MP_DATA.forEach(mp => {
+    if (!stats[mp.party]) {
+      stats[mp.party] = { total:0, staffing:0, office:0, accommodation:0, travel:0, count:0 };
+    }
+    stats[mp.party].total         += mp.total;
+    stats[mp.party].staffing      += mp.staffing;
+    stats[mp.party].office        += mp.office;
+    stats[mp.party].accommodation += mp.accommodation;
+    stats[mp.party].travel        += mp.travel;
+    stats[mp.party].count++;
+  });
+  // compute averages
+  Object.keys(stats).forEach(p => {
+    const s = stats[p];
+    s.avgTotal   = s.total / s.count;
+    s.avgStaff   = s.staffing / s.count;
+    s.avgOffice  = s.office / s.count;
+    s.avgAccomm  = s.accommodation / s.count;
+    s.avgTravel  = s.travel / s.count;
+  });
+  return stats;
+}
+
+// ============================================================
+//  HERO STATS
+// ============================================================
+function renderHeroStats() {
+  const total   = MP_DATA.reduce((s, m) => s + m.total, 0);
+  const avg     = total / MP_DATA.length;
+  const highest = Math.max(...MP_DATA.map(m => m.total));
+
+  document.getElementById('stat-total').textContent   = fmtShort(total);
+  document.getElementById('stat-mps').textContent     = MP_DATA.length;
+  document.getElementById('stat-avg').textContent     = fmtShort(avg);
+  document.getElementById('stat-highest').textContent = fmtShort(highest);
+}
+
+// ============================================================
+//  PARTY CARDS
+// ============================================================
+function renderPartyCards() {
+  const stats  = computePartyStats();
+  const sorted = Object.entries(stats).sort((a, b) => b[1].avgTotal - a[1].avgTotal);
+  const maxAvg = sorted[0][1].avgTotal;
+
+  const container = document.getElementById('party-cards');
+  container.innerHTML = '';
+
+  sorted.forEach(([party, s]) => {
+    const cfg = PARTY_CONFIG[party] || { color: '#94a3b8', text: '#fff', seats: 0 };
+    const pct = (s.avgTotal / maxAvg * 100).toFixed(1);
+
+    container.innerHTML += `
+      <div class="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <div class="flex items-center gap-2">
+            ${partyBadge(party)}
+            <span class="text-slate-400 text-xs">${s.count} MPs in sample</span>
+          </div>
+          <div class="text-right">
+            <div class="text-white font-bold">${fmt(s.avgTotal)}</div>
+            <div class="text-slate-500 text-xs">avg / MP</div>
+          </div>
+        </div>
+        <div class="w-full bg-slate-800 rounded-full h-1.5 mt-2">
+          <div class="h-1.5 rounded-full bar-fill" style="width:${pct}%;background:${cfg.color}"></div>
+        </div>
+        <div class="flex justify-between text-xs text-slate-500 mt-1">
+          <span>Staffing: ${fmt(s.avgStaff)}</span>
+          <span>Travel: ${fmt(s.avgTravel)}</span>
+        </div>
+      </div>`;
+  });
+}
+
+// ============================================================
+//  BAR CHART
+// ============================================================
+function renderBarChart() {
+  const stats  = computePartyStats();
+  const sorted = Object.entries(stats).sort((a, b) => b[1].avgTotal - a[1].avgTotal);
+  const labels = sorted.map(([p]) => p);
+  const data   = sorted.map(([, s]) => Math.round(s.avgTotal));
+  const colors = labels.map(p => (PARTY_CONFIG[p] || {color:'#94a3b8'}).color);
+
+  new Chart(document.getElementById('partyBarChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data, backgroundColor: colors, borderRadius: 6, borderSkipped: false }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: { label: ctx => ' ' + fmt(ctx.raw) }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#94a3b8', font: { size: 11 } }, grid: { color: '#1e293b' } },
+        y: {
+          ticks: { color: '#94a3b8', font: { size: 11 }, callback: v => '£' + (v/1000)+'k' },
+          grid: { color: '#1e293b' }
+        }
+      }
+    }
+  });
+}
+
+// ============================================================
+//  TABLE
+// ============================================================
+let sortCol = 'total';
+let sortAsc = false;
+let searchVal = '';
+let partyFilter = '';
+
+function getFiltered() {
+  let data = [...MP_DATA];
+  if (searchVal) {
+    const q = searchVal.toLowerCase();
+    data = data.filter(m => m.name.toLowerCase().includes(q) || m.constituency.toLowerCase().includes(q));
+  }
+  if (partyFilter) {
+    data = data.filter(m => m.party === partyFilter);
+  }
+  data.sort((a, b) => {
+    const av = typeof a[sortCol] === 'string' ? a[sortCol].toLowerCase() : a[sortCol];
+    const bv = typeof b[sortCol] === 'string' ? b[sortCol].toLowerCase() : b[sortCol];
+    return sortAsc ? (av > bv ? 1 : -1) : (av < bv ? 1 : -1);
+  });
+  return data;
+}
+
+function rankBadge(i, globalRank) {
+  if (globalRank === 1) return `<span class="inline-flex w-7 h-7 rounded-full items-center justify-center text-xs font-bold top-1-badge text-white">1</span>`;
+  if (globalRank === 2) return `<span class="inline-flex w-7 h-7 rounded-full items-center justify-center text-xs font-bold top-2-badge text-white">2</span>`;
+  if (globalRank === 3) return `<span class="inline-flex w-7 h-7 rounded-full items-center justify-center text-xs font-bold top-3-badge text-white">3</span>`;
+  return `<span class="text-slate-500 text-xs w-7 text-center inline-block">${globalRank}</span>`;
+}
+
+function renderTable() {
+  const sorted = MP_DATA.slice().sort((a, b) => b.total - a.total);
+  const rankMap = {};
+  sorted.forEach((m, i) => rankMap[m.name] = i + 1);
+
+  const filtered = getFiltered();
+  const tbody    = document.getElementById('leaderboard-table');
+  const count    = document.getElementById('table-count');
+
+  tbody.innerHTML = filtered.map((m, i) => {
+    const rank = rankMap[m.name];
+    const cfg  = PARTY_CONFIG[m.party] || { color: '#94a3b8' };
+    return `
+      <tr class="mp-row border-b border-slate-800/60">
+        <td class="px-4 py-3">${rankBadge(i, rank)}</td>
+        <td class="px-4 py-3">
+          <div class="font-semibold text-slate-100">${m.name}</div>
+          <div class="flex items-center gap-1 mt-0.5">${partyBadge(m.party)}</div>
+        </td>
+        <td class="px-4 py-3 text-slate-400 hidden sm:table-cell text-xs">${m.constituency}</td>
+        <td class="px-4 py-3 text-right text-slate-300 tabular-nums">${fmt(m.staffing)}</td>
+        <td class="px-4 py-3 text-right text-slate-400 tabular-nums hidden md:table-cell">${fmt(m.office)}</td>
+        <td class="px-4 py-3 text-right hidden md:table-cell tabular-nums ${m.accommodation === 0 ? 'text-slate-600' : 'text-slate-400'}">${m.accommodation === 0 ? '—' : fmt(m.accommodation)}</td>
+        <td class="px-4 py-3 text-right text-slate-400 tabular-nums hidden md:table-cell">${fmt(m.travel)}</td>
+        <td class="px-4 py-3 text-right font-bold tabular-nums" style="color:${cfg.color}">${fmt(m.total)}</td>
+      </tr>`;
+  }).join('');
+
+  count.textContent = `Showing ${filtered.length} of ${MP_DATA.length} MPs`;
+
+  // Update active sort header
+  document.querySelectorAll('.sortable-th').forEach(th => {
+    const col = th.dataset.col;
+    th.classList.toggle('active', col === sortCol);
+    th.classList.toggle('text-white', col === sortCol);
+    th.classList.toggle('text-slate-400', col !== sortCol);
+    let arrow = th.querySelector('.sort-arrow');
+    if (!arrow) {
+      arrow = document.createElement('span');
+      arrow.className = 'sort-arrow ml-1 opacity-50';
+      th.appendChild(arrow);
+    }
+    if (col === sortCol) {
+      arrow.textContent = sortAsc ? '↑' : '↓';
+      arrow.classList.replace('opacity-50', 'opacity-100');
+    } else {
+      arrow.textContent = '↕';
+      arrow.classList.replace('opacity-100', 'opacity-50');
+    }
+  });
+}
+
+// ============================================================
+//  CATEGORY STACKED CHART
+// ============================================================
+function renderCategoryCharts() {
+  const stats  = computePartyStats();
+  const sorted = Object.entries(stats).sort((a, b) => b[1].avgTotal - a[1].avgTotal);
+  const labels = sorted.map(([p]) => p);
+  const colors = labels.map(p => (PARTY_CONFIG[p] || {color:'#94a3b8'}).color);
+
+  new Chart(document.getElementById('categoryStackedChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Staffing',
+          data: sorted.map(([, s]) => Math.round(s.avgStaff)),
+          backgroundColor: labels.map(p => (PARTY_CONFIG[p]||{color:'#94a3b8'}).color + 'cc'),
+          borderRadius: { topLeft: 0, topRight: 0, bottomLeft: 4, bottomRight: 4 },
+          stack: 'a'
+        },
+        {
+          label: 'Office',
+          data: sorted.map(([, s]) => Math.round(s.avgOffice)),
+          backgroundColor: labels.map(p => (PARTY_CONFIG[p]||{color:'#94a3b8'}).color + '88'),
+          stack: 'a'
+        },
+        {
+          label: 'Accommodation',
+          data: sorted.map(([, s]) => Math.round(s.avgAccomm)),
+          backgroundColor: labels.map(p => (PARTY_CONFIG[p]||{color:'#94a3b8'}).color + '55'),
+          stack: 'a'
+        },
+        {
+          label: 'Travel',
+          data: sorted.map(([, s]) => Math.round(s.avgTravel)),
+          backgroundColor: labels.map(p => (PARTY_CONFIG[p]||{color:'#94a3b8'}).color + '33'),
+          borderRadius: { topLeft: 4, topRight: 4, bottomLeft: 0, bottomRight: 0 },
+          stack: 'a'
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { labels: { color: '#94a3b8', font: { size: 11 } } },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.raw)}` } }
+      },
+      scales: {
+        x: { stacked: true, ticks: { color: '#94a3b8', font: { size: 10 } }, grid: { display: false } },
+        y: { stacked: true, ticks: { color: '#94a3b8', callback: v => '£'+(v/1000)+'k' }, grid: { color: '#1e293b' } }
+      }
+    }
+  });
+
+  // Pie chart — overall category split
+  const totals = { staffing: 0, office: 0, accommodation: 0, travel: 0 };
+  MP_DATA.forEach(m => {
+    totals.staffing      += m.staffing;
+    totals.office        += m.office;
+    totals.accommodation += m.accommodation;
+    totals.travel        += m.travel;
+  });
+
+  new Chart(document.getElementById('categoryPieChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['Staffing', 'Office Costs', 'Accommodation', 'Travel'],
+      datasets: [{
+        data: [totals.staffing, totals.office, totals.accommodation, totals.travel],
+        backgroundColor: ['#3b82f6', '#f59e0b', '#10b981', '#ec4899'],
+        borderColor: '#0f172a',
+        borderWidth: 2,
+        hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { color: '#94a3b8', font: { size: 11 }, padding: 12 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const pct = (ctx.raw / Object.values(totals).reduce((a,b)=>a+b,0) * 100).toFixed(1);
+              return ` ${ctx.label}: ${fmt(ctx.raw)} (${pct}%)`;
+            }
+          }
+        }
+      },
+      cutout: '60%'
+    }
+  });
+}
+
+// ============================================================
+//  TOP / BOTTOM 10
+// ============================================================
+function renderTopBottom() {
+  const sorted = MP_DATA.slice().sort((a, b) => b.total - a.total);
+  const top10  = sorted.slice(0, 10);
+  const bot10  = sorted.slice(-10).reverse();
+
+  function renderList(items, elId, isTop) {
+    const el = document.getElementById(elId);
+    const maxVal = items[0].total;
+    el.innerHTML = items.map((m, i) => {
+      const cfg = PARTY_CONFIG[m.party] || { color: '#94a3b8' };
+      const pct = (m.total / maxVal * 100).toFixed(0);
+      return `
+        <div class="bg-slate-900 border border-slate-800 rounded-lg p-3 flex items-center gap-3">
+          <span class="text-slate-500 text-xs w-5 text-center font-mono">${i+1}</span>
+          <div style="width:4px;height:36px;border-radius:2px;background:${cfg.color};flex-shrink:0"></div>
+          <div class="flex-1 min-w-0">
+            <div class="font-semibold text-sm text-slate-100 truncate">${m.name}</div>
+            <div class="text-xs text-slate-500 truncate">${m.constituency}</div>
+            <div class="h-1 bg-slate-800 rounded mt-1.5">
+              <div style="width:${pct}%;height:100%;background:${cfg.color};border-radius:2px"></div>
+            </div>
+          </div>
+          <div class="text-right flex-shrink-0">
+            <div class="font-bold text-sm" style="color:${cfg.color}">${fmt(m.total)}</div>
+            <div class="text-xs mt-0.5">${partyBadge(m.party)}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  renderList(top10,  'top10',    true);
+  renderList(bot10,  'bottom10', false);
+}
+
+// ============================================================
+//  POPULATE PARTY FILTER
+// ============================================================
+function populatePartyFilter() {
+  const parties = [...new Set(MP_DATA.map(m => m.party))].sort();
+  const sel = document.getElementById('party-filter');
+  parties.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = p;
+    sel.appendChild(opt);
+  });
+}
+
+// ============================================================
+//  EVENT LISTENERS
+// ============================================================
+document.getElementById('search-input').addEventListener('input', e => {
+  searchVal = e.target.value;
+  renderTable();
+});
+
+document.getElementById('party-filter').addEventListener('change', e => {
+  partyFilter = e.target.value;
+  renderTable();
+});
+
+document.getElementById('category-filter').addEventListener('change', e => {
+  sortCol = e.target.value;
+  sortAsc = false;
+  renderTable();
+});
+
+document.querySelectorAll('.sortable-th').forEach(th => {
+  th.addEventListener('click', () => {
+    const col = th.dataset.col;
+    if (sortCol === col) { sortAsc = !sortAsc; }
+    else { sortCol = col; sortAsc = col === 'name'; }
+    renderTable();
+  });
+});
+
+// ============================================================
+//  INIT
+// ============================================================
+renderHeroStats();
+populatePartyFilter();
+renderPartyCards();
+renderBarChart();
+renderTable();
+renderCategoryCharts();
+renderTopBottom();
+</script>
+</body>
+</html>
