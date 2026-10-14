@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Street View Track Builder</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root { --bg:#f6f6f4; --panel:#fff; --text:#1d1d1f; --muted:#6b6b70; --line:#dcdcd8; --accent:#c2410c; --accent-text:#fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#141416; --panel:#1e1e21; --text:#ececee; --muted:#9b9ba3; --line:#333338; --accent:#f97316; --accent-text:#111; } }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, sans-serif; background:var(--bg); color:var(--text); display:flex; height:100vh; }
+  aside { width:340px; padding:16px; overflow:auto; background:var(--panel); border-right:1px solid var(--line); display:flex; flex-direction:column; gap:12px; }
+  #map { flex:1; }
+  h1 { font-size:18px; margin:0; }
+  p.hint { color:var(--muted); margin:0; font-size:13px; }
+  label { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  input[type=text], input[type=number] { width:140px; padding:5px 7px; border:1px solid var(--line); border-radius:6px; background:var(--bg); color:var(--text); }
+  input[type=text] { width:180px; }
+  button { padding:9px 12px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--text); cursor:pointer; font-weight:600; }
+  button.primary { background:var(--accent); color:var(--accent-text); border-color:var(--accent); }
+  button:disabled { opacity:.5; cursor:default; }
+  .row { display:flex; gap:8px; }
+  .stat { font-variant-numeric:tabular-nums; color:var(--muted); }
+  pre { flex-shrink:0; min-height:120px; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:8px; font-size:12px; white-space:pre-wrap; max-height:260px; overflow:auto; margin:0; }
+  a.dl { display:block; text-align:center; padding:9px; border-radius:8px; background:var(--accent); color:var(--accent-text); text-decoration:none; font-weight:600; }
+  .warn { font-size:12px; color:var(--muted); border-left:3px solid var(--accent); padding-left:8px; }
+  @media (max-width: 760px) { body { flex-direction:column; height:auto; } aside { width:100%; border-right:0; } #map { height:60vh; flex:none; } }
+</style>
+</head>
+<body>
+<aside>
+  <h1>Street View → Assetto Corsa</h1>
+  <p class="hint">Click the map to drop waypoints along the roads you want to race. Drag to move, right-click (long-press) to delete.</p>
+  <label>Track name <input type="text" id="name" value="My Street Circuit"></label>
+  <label>Closed loop <input type="checkbox" id="closed" checked></label>
+  <label>Snap to roads <input type="checkbox" id="follow" checked></label>
+  <label>Road width (m) <input type="number" id="width" value="9" min="4" max="30" step="0.5"></label>
+  <label>Street View every (m) <input type="number" id="spacing" value="25" min="10" max="200" step="5"></label>
+  <label>Pit boxes <input type="number" id="pits" value="10" min="1" max="30"></label>
+  <label>Mask sky in photos <input type="checkbox" id="sky" checked></label>
+  <label>Offline demo (no API) <input type="checkbox" id="offline"></label>
+  <details id="pastebox">
+    <summary>Or paste waypoints</summary>
+    <textarea id="paste" rows="5" placeholder="lat,lng per line, e.g.&#10;51.5007,-0.1246&#10;51.5035,-0.1195" style="width:100%;margin-top:6px"></textarea>
+    <button id="usepaste" style="width:100%">Use these points</button>
+  </details>
+  <div class="stat" id="stats">0 waypoints</div>
+  <div class="row">
+    <button id="undo">Undo</button>
+    <button id="clear">Clear</button>
+    <button class="primary" id="build" style="flex:1">Build track</button>
+  </div>
+  <div id="result"></div>
+  <pre id="log" hidden></pre>
+  <p class="warn">Street View images are © Google and governed by the Google Maps Platform Terms. Keep generated tracks for personal use.</p>
+</aside>
+<div id="map"></div>
+<script>
+const $ = id => document.getElementById(id);
+// If the map library can't load (offline / blocked CDN) fall back to pasted coordinates only.
+const shim = !window.L;
+if (shim) {
+  $("map").innerHTML = '<p style="padding:24px;color:var(--muted)">Map unavailable (could not load Leaflet). Paste waypoints in the sidebar instead.</p>';
+  $("pastebox").open = true;
+  const pt = ll => ({ lat: ll.lat ?? ll[0], lng: ll.lng ?? ll[1] });
+  window.L = { marker: ll => ({ _ll: pt(ll), addTo() { return this; }, on() {}, getLatLng() { return this._ll; } }) };
+}
+const map = shim
+  ? { on() {}, removeLayer() {}, fitBounds() {}, distance: (a, b) => { const r = Math.PI / 180, x = (b.lng - a.lng) * r * Math.cos((a.lat + b.lat) * r / 2), y = (b.lat - a.lat) * r; return 6371000 * Math.hypot(x, y); } }
+  : L.map("map").setView([51.505, -0.12], 14);
+if (!shim) L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(map);
+const markers = [];
+const line = shim ? { setLatLngs() {} } : L.polyline([], { color: "#f97316", weight: 4 }).addTo(map);
+
+function redraw() {
+  const pts = markers.map(m => m.getLatLng());
+  if ($("closed").checked && pts.length > 2) pts.push(pts[0]);
+  line.setLatLngs(pts);
+  let d = 0;
+  for (let i = 1; i < pts.length; i++) d += map.distance(pts[i - 1], pts[i]);
+  const imgs = Math.round(d / +$("spacing").value) * 2 + 1;
+  $("stats").textContent = `${markers.length} waypoints · ~${(d / 1000).toFixed(2)} km straight-line · ~${imgs} Street View images (≈ $${(imgs * 0.007).toFixed(2)})`;
+}
+function addMarker(latlng) {
+  const m = L.marker(latlng, { draggable: true }).addTo(map);
+  m.on("drag", redraw);
+  m.on("contextmenu", () => { map.removeLayer(m); markers.splice(markers.indexOf(m), 1); redraw(); });
+  markers.push(m); redraw();
+}
+map.on("click", e => addMarker(e.latlng));
+["closed", "spacing"].forEach(id => $(id).addEventListener("input", redraw));
+$("undo").onclick = () => { const m = markers.pop(); if (m) map.removeLayer(m); redraw(); };
+$("clear").onclick = () => { markers.splice(0).forEach(m => map.removeLayer(m)); redraw(); };
+$("usepaste").onclick = () => {
+  const pts = $("paste").value.split(/[\n;]+/).map(l => l.split(",").map(Number)).filter(p => p.length >= 2 && p.every(isFinite));
+  if (pts.length < 2) { alert("Need at least two lat,lng lines."); return; }
+  $("clear").onclick();
+  pts.forEach(p => addMarker(p));
+  if (!shim) map.fitBounds(pts, { padding: [40, 40] });
+};
+
+fetch("/api/config").then(r => r.json()).then(c => {
+  if (!c.has_key) { $("offline").checked = true; $("offline").disabled = true; }
+});
+
+$("build").onclick = async () => {
+  if (markers.length < 2) { alert("Add at least two waypoints."); return; }
+  $("build").disabled = true; $("result").innerHTML = ""; $("log").hidden = false; $("log").textContent = "Starting…";
+  const body = {
+    name: $("name").value, closed: $("closed").checked, follow_roads: $("follow").checked,
+    road_width: +$("width").value, sv_spacing: +$("spacing").value, pitboxes: +$("pits").value,
+    sky_mask: $("sky").checked, offline: $("offline").checked,
+    waypoints: markers.map(m => [m.getLatLng().lat, m.getLatLng().lng]),
+  };
+  const r = await fetch("/api/build", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  const { job, error } = await r.json();
+  if (error) { $("log").textContent = error; $("build").disabled = false; return; }
+  const poll = async () => {
+    const s = await (await fetch(`/api/jobs/${job}`)).json();
+    $("log").textContent = s.log.join("\n"); $("log").scrollTop = 1e9;
+    if (s.state === "running") return setTimeout(poll, 1000);
+    $("build").disabled = false;
+    if (s.state === "done") $("result").innerHTML = `<a class="dl" href="/api/jobs/${job}/download">Download track (.zip)</a>`;
+  };
+  poll();
+};
+redraw();
+</script>
+</body>
+</html>

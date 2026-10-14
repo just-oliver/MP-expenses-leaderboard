@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sv2ac"
+version = "0.1.0"
+description = "Generate Assetto Corsa tracks from real roads using Google Street View imagery"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "Pillow>=10.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+sv2ac = "sv2ac.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["sv2ac*"]
+
+[tool.setuptools.package-data]
+sv2ac = ["web/index.html"]
